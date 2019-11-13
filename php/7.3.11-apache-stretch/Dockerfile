@@ -1,4 +1,4 @@
-FROM php:7.3.11-apache-stretch
+FROM php:7.3.11
 
 MAINTAINER Erik Tonon <https://www.linkedin.com/in/erik-tonon-83817b145/>
 
