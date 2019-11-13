@@ -1,4 +1,4 @@
-FROM php:7.3.11
+FROM php:7.3.11-apache-stretch
 
 MAINTAINER Erik Tonon <https://www.linkedin.com/in/erik-tonon-83817b145/>
 
@@ -31,9 +31,9 @@ RUN rm /etc/localtime &&\
 
 # Oracle instantclient
 # copy oracle files
-ADD oracle_teste/instantclient-basic-linux.x64-12.1.0.2.0.zip /tmp/
-ADD oracle_teste/instantclient-sdk-linux.x64-12.1.0.2.0.zip /tmp/
-ADD oracle_teste/instantclient-sqlplus-linux.x64-12.1.0.2.0.zip /tmp/
+ADD oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip /tmp/
+ADD oracle/instantclient-sdk-linux.x64-12.1.0.2.0.zip /tmp/
+ADD oracle/instantclient-sqlplus-linux.x64-12.1.0.2.0.zip /tmp/
 ENV LD_LIBRARY_PATH /usr/local/instantclient
 ENV TNS_ADMIN       /usr/local/instantclient
 ENV ORACLE_BASE     /usr/local/instantclient
