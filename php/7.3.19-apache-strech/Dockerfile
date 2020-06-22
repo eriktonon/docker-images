@@ -1,4 +1,6 @@
-FROM php:7.3.12-apache-stretch
+FROM php:7.3.19-apache-stretch
+
+
 
 MAINTAINER Erik Tonon <https://www.linkedin.com/in/erik-tonon-83817b145/>
 
@@ -23,7 +25,6 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install zip \
     && docker-php-ext-install sockets
 
-RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
 # Set timezone
 RUN rm /etc/localtime &&\
@@ -90,9 +91,11 @@ RUN apt-get install -y --no-install-recommends libmagickwand-dev \
     && pecl install imagick-3.4.3 \
     && docker-php-ext-enable imagick
 
+#PHP INI
+RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
 #Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 RUN a2enmod rewrite \
     && a2enmod headers

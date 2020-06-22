@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
 RUN rm /etc/localtime &&\
     ln -s /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime &&\
     "date"
+RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
 #Install pecl
 RUN curl -O http://pear.php.net/go-pear.phar \
