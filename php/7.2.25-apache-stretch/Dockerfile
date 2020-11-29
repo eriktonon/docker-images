@@ -20,8 +20,10 @@ RUN apt-get update && apt-get install -y \
     unixodbc \
     tdsodbc \
     libzip-dev \
+    libpng-dev \
     && docker-php-ext-install zip \
-    && docker-php-ext-install sockets
+    && docker-php-ext-install sockets \
+    && docker-php-ext-install gd
 
 RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
