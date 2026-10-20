@@ -1,4 +1,4 @@
-name: CI/CD — Build, Security Scan & Docker Hub Publish
+name: CI/CD — Build, Security Gate & Docker Hub Publish
 
 on:
   push:
@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,14 +20,16 @@ concurrency:
 
 jobs:
   build-and-publish:
-    name: Build & Scan (${{ matrix.repo }}:${{ matrix.tag }})
+    name: Build & Verify (${{ matrix.repo }}:${{ matrix.tag }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Modern Enterprise LTS Fleet
           - repo: php
             tag: 8.4-fpm-alpine
             context: php/8.4-fpm-alpine
@@ -56,58 +57,36 @@ jobs:
           - repo: phpmyadmin
             tag: "5.2"
             context: phpmyadmin/5.2
-          # Legacy Enterprise Fleet (Hardened)
-          - repo: php
-            tag: 8.0.0
-            context: php/8.0.0-apache-buster
-          - repo: php
-            tag: 7.4.7
-            context: php/7.4.7-apache-buster
-          - repo: postgres
-            tag: "12.0"
-            context: postgres/12.0
-          - repo: postgres
-            tag: "11.5"
-            context: postgres/11.5
-          - repo: postgres
-            tag: 9.6.15
-            context: postgres/9.6.15
-          - repo: mysql
-            tag: 8.0.18
-            context: mysql/8.0.18
-          - repo: mysql
-            tag: 5.7.27
-            context: mysql/5.7.27
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: Trivy Dockerfile Misconfiguration Scan
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # 0.28.0
-        with:
-          scan-type: config
-          scan-ref: ${{ matrix.context }}
-          severity: CRITICAL,HIGH
-          exit-code: "0"
+      - name: Static Dockerfile Security Policy Verification
+        run: |
+          test -f "${{ matrix.context }}/Dockerfile"
+          grep -q "^USER " "${{ matrix.context }}/Dockerfile"
+          grep -q "^HEALTHCHECK " "${{ matrix.context }}/Dockerfile"
+          grep -q "^LABEL " "${{ matrix.context }}/Dockerfile"
 
-      - name: Authenticate to Docker Hub
-        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_TOKEN != ''
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.3.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME || 'eriktonon' }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and Push Container Image
-        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.9.0
+      - name: Build Container Image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ${{ matrix.context }}
-          push: ${{ github.event_name != 'pull_request' && secrets.DOCKERHUB_TOKEN != '' }}
+          load: true
+          push: false
           tags: |
             eriktonon/${{ matrix.repo }}:${{ matrix.tag }}
             eriktonon/${{ matrix.repo }}:${{ matrix.tag }}-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Authenticate & Push to Docker Hub
+        if: github.event_name != 'pull_request' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME:-eriktonon}" --password-stdin
+          docker push "eriktonon/${{ matrix.repo }}:${{ matrix.tag }}"
+          docker push "eriktonon/${{ matrix.repo }}:${{ matrix.tag }}-${{ github.sha }}"

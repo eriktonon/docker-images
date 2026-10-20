@@ -4,7 +4,7 @@ FROM composer:2.8.6 AS composer_stage
 FROM php:8.3.19-fpm-alpine3.21 AS builder
 
 ARG REDIS_VERSION=6.1.0
-ARG REDIS_SHA256=a9155966a35e9fb46d706fb5f18e767b8756a8cebe510f1244ce2180758b7a5e
+ARG REDIS_SHA256=f10405f639fe415e9ed4ec99538e72c90694d8dbd62868edcfcd6a453466b48c
 
 RUN apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \

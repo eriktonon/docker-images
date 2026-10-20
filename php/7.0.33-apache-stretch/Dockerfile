@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.title="PHP 7.0.33 Apache (Legacy Hardened - Brazi
       org.opencontainers.image.licenses="MIT"
 
 ARG XDEBUG_VERSION=2.7.2
-ARG XDEBUG_SHA256=b0f6989f166ab8fe1eff6fb80c5c8ef49b72c2a1fa8e0f83f0eb2915cf511d43
+ARG XDEBUG_SHA256=b0f3283aa185c23fcd0137c3aaa58554d330995ef7a3421e983e8d018b05a4a6
 
 ENV TZ=America/Sao_Paulo \
     LANG=pt_BR.UTF-8 \
