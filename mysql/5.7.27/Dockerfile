@@ -1,13 +1,21 @@
+# syntax=docker/dockerfile:1
 FROM mysql:5.7.27
 
-RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    locales-all \
-    task-brazilian-portuguese \
-    curl \
-    wget
-    #Set timezone Brazil
-RUN rm /etc/localtime &&\
-    ln -s /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime &&\
-    "date"
+LABEL org.opencontainers.image.title="MySQL 5.7.27 (Legacy Hardened - Brazil TZ)" \
+      org.opencontainers.image.description="MySQL 5.7.27 container pre-configured for America/Sao_Paulo timezone" \
+      org.opencontainers.image.vendor="Erik Tonon" \
+      org.opencontainers.image.authors="Erik Tonon <https://eriktonon.com>" \
+      org.opencontainers.image.source="https://github.com/eriktonon/docker-images" \
+      org.opencontainers.image.licenses="MIT"
+
+ENV TZ=America/Sao_Paulo
+
+RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime \
+    && echo "${TZ}" > /etc/timezone
+
+EXPOSE 3306
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD mysqladmin ping -h 127.0.0.1 --silent || exit 1
+
+USER mysql

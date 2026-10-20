@@ -1,0 +1,17 @@
+# Git & CI/CD metadata
+.git
+.gitignore
+.github
+
+# Documentation & governance
+*.md
+LICENSE
+Makefile
+docs/
+
+# Local environment & secrets
+.env
+.env.*
+*.pem
+*.key
+*.enc

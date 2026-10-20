@@ -1,53 +1,85 @@
+# syntax=docker/dockerfile:1
+FROM composer:2.2.24 AS composer_stage
+
 FROM php:7.0.33-apache-stretch
 
-MAINTAINER eriktonon@gmail.com <https://www.linkedin.com/in/erik-tonon-83817b145/>
+LABEL org.opencontainers.image.title="PHP 7.0.33 Apache (Legacy Hardened - Brazil TZ)" \
+      org.opencontainers.image.description="Hardened PHP 7.0.33 Apache container pre-configured for America/Sao_Paulo and pt_BR.UTF-8" \
+      org.opencontainers.image.vendor="Erik Tonon" \
+      org.opencontainers.image.authors="Erik Tonon <https://eriktonon.com>" \
+      org.opencontainers.image.source="https://github.com/eriktonon/docker-images" \
+      org.opencontainers.image.licenses="MIT"
 
-RUN apt-get update && apt-get install -y \
-    git \
-    zlib1g-dev \
-    unzip \
-    freetds-dev \
-    freetds-bin \
-    libxml2-dev \
-    libicu-dev \
-    locales-all \
-    task-brazilian-portuguese \
-    libaio-dev \
-    libzip-dev \
-    curl \
-    && docker-php-ext-install zip
+ARG XDEBUG_VERSION=2.7.2
+ARG XDEBUG_SHA256=b0f6989f166ab8fe1eff6fb80c5c8ef49b72c2a1fa8e0f83f0eb2915cf511d43
 
-#Set timezone Brazil
-RUN rm /etc/localtime &&\
-    ln -s /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime &&\
-    "date"
+ENV TZ=America/Sao_Paulo \
+    LANG=pt_BR.UTF-8 \
+    LANGUAGE=pt_BR:pt:en \
+    LC_ALL=pt_BR.UTF-8 \
+    APACHE_DOCUMENT_ROOT=/var/www/html/public
 
-#Install pecl
-RUN curl -O http://pear.php.net/go-pear.phar \
-    ; /usr/local/bin/php -d detect_unicode=0 go-pear.phar
-
-# xDEBUG testing
-RUN pecl install xdebug \
+RUN sed -i 's/deb.debian.org/archive.debian.org/g; s|security.debian.org/debian-security|archive.debian.org/debian-security|g; /stretch-updates/d' /etc/apt/sources.list \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        freetds-bin \
+        freetds-dev \
+        git \
+        libaio-dev \
+        libicu-dev \
+        libxml2-dev \
+        libzip-dev \
+        locales \
+        tzdata \
+        unzip \
+        zlib1g-dev \
+    && sed -i '/pt_BR.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen pt_BR.UTF-8 \
+    && ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime \
+    && echo "${TZ}" > /etc/timezone \
+    && docker-php-ext-configure pdo_dblib --with-libdir=/lib/x86_64-linux-gnu \
+    && docker-php-ext-install -j"$(nproc)" \
+        intl \
+        mbstring \
+        mysqli \
+        pdo \
+        pdo_dblib \
+        pdo_mysql \
+        soap \
+        zip \
+    && curl -fsSL "https://pecl.php.net/get/xdebug-${XDEBUG_VERSION}.tgz" -o /tmp/xdebug.tgz \
+    && echo "${XDEBUG_SHA256}  /tmp/xdebug.tgz" | sha256sum -c - \
+    && pecl install /tmp/xdebug.tgz \
     && docker-php-ext-enable xdebug \
-    && echo 'xdebug.remote_enable=on' >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo 'xdebug.remote_host=10.0.75.1' >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo 'xdebug.remote_port=9000' >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && a2enmod rewrite
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# DRIVER MYSQL PDO
- RUN docker-php-ext-install pdo pdo_mysql zip 
- RUN docker-php-ext-install mysqli
-#Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+COPY --from=composer_stage /usr/bin/composer /usr/local/bin/composer
 
-RUN a2enmod rewrite \
-    && a2enmod headers
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    && { \
+        echo "date.timezone = ${TZ}"; \
+        echo "expose_php = Off"; \
+        echo "display_errors = Off"; \
+        echo "log_errors = On"; \
+        echo "session.cookie_httponly = 1"; \
+        echo "session.use_strict_mode = 1"; \
+    } > "$PHP_INI_DIR/conf.d/99-hardening.ini" \
+    && { \
+        echo "xdebug.discover_client_host = 0"; \
+        echo "xdebug.client_host = host.docker.internal"; \
+        echo "xdebug.start_with_request = trigger"; \
+    } > "$PHP_INI_DIR/conf.d/98-xdebug-hardened.ini" \
+    && sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
+    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
+    && a2enmod rewrite headers \
+    && mkdir -p "${APACHE_DOCUMENT_ROOT}" \
+    && chown -R www-data:www-data /var/www /var/run/apache2 /var/lock/apache2 /var/log/apache2
 
-#SOAP PHP EXT
-RUN docker-php-ext-install soap \
-    && docker-php-ext-install pdo intl mbstring \
-    && docker-php-ext-configure pdo_dblib --with-libdir=/lib/x86_64-linux-gnu
+EXPOSE 80
 
-#XDEBUG
-RUN docker-php-ext-install pdo_dblib \
-    && docker-php-ext-enable intl mbstring pdo_dblib
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:80/ || exit 1
+
+USER www-data
